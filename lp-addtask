@@ -1,0 +1,27 @@
+#!/usr/bin/env python
+
+import argparse
+import os
+
+from launchpadlib.credentials import UnencryptedFileCredentialStore
+from launchpadlib.launchpad import Launchpad
+
+parser = argparse.ArgumentParser()
+parser.add_argument('bug',
+                    help='bug number to change',
+                    type=int)
+parser.add_argument('package',
+                    help='src name to add the task')
+parser.add_argument('release',
+                    help='release to mark affected')
+args = parser.parse_args()
+
+#lp=Launchpad.login_with('cpc', 'production', version='devel')
+cred_location = os.path.expanduser('~/.lp_creds')
+credential_store = UnencryptedFileCredentialStore(cred_location)
+lp=Launchpad.login_with('affectrelease', 'production', version='devel')
+
+bug=lp.bugs[1787405]
+target="/ubuntu/%s/+source/%s" % (args.release, args.package)
+
+bug.addTask(target=target)
