@@ -25,7 +25,7 @@ match_gets()
 
 remove_get_start()
 {
-	sed -e 's/Get:.*\/ubuntu [a-z0-9\/-]* amd64 //g'
+	sed -e 's/Get:.*\/ubuntu [a-z0-9\/-]* amd64 \(.*\)\[.*\]/\1/g'
 }
 
 save_log()
@@ -50,4 +50,4 @@ FILE_2=/tmp/build.2
 save_log "$FILE_1" "$URL_1"
 save_log "$FILE_2" "$URL_2"
 
-diff "$FILE_1" "$FILE_2"
+diff -y --suppress-common-lines "$FILE_1" "$FILE_2"
