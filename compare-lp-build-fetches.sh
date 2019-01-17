@@ -50,4 +50,4 @@ FILE_2=/tmp/build.2
 save_log "$FILE_1" "$URL_1"
 save_log "$FILE_2" "$URL_2"
 
-diff -y --suppress-common-lines "$FILE_1" "$FILE_2"
+diff -y  -t --suppress-common-lines "$FILE_1" "$FILE_2"
