@@ -7,10 +7,15 @@ show_help()
 	echo "Usage: $(basename $0) [options] <image>
 
 Options:
-	-n <name>: Specify the name of the container to create (default same as image name)
+	-n <name>: Specify the name of the VM to create (default same as image name)
     -r <remote>: Specify which remote to use (default ubuntu-daily)
     -u: Don't dist-upgrade
-    -d: Add debug symbol repositories"
+    -d: Add debug symbol repositories
+
+Use uvt-simplestreams-libvirt to sync the latest images:
+
+    uvt-simplestreams-libvirt sync --source http://cloud-images.ubuntu.com/daily arch=amd64 release=disco
+    uvt-simplestreams-libvirt sync arch=amd64 release=disco"
 }
 
 usage()
@@ -22,7 +27,7 @@ usage()
 lxc_is_network_up()
 {
 	container=$1
-    lxc exec $container -- grep $'\t0003\t' /proc/net/route >/dev/null
+    uvt-kvm ssh $container -- grep $'\t0003\t' /proc/net/route >/dev/null
 }
 
 lxc_wait_for_network()
@@ -36,7 +41,7 @@ lxc_wait_for_network()
 }
 
 CONTAINER_NAME=
-REMOTE=ubuntu-daily
+REMOTE=daily
 DIST_UPGRADE=1
 DEBUG_SYMBOLS=0
 
@@ -74,30 +79,35 @@ if [ -z "$CONTAINER_NAME" ]; then
     CONTAINER_NAME=$IMAGE
 fi
 
+REMOTE_ARG=label=$REMOTE
+if [ ! "$REMOTE" == "daily" ]; then
+    REMOTE_ARG=
+fi
+
 echo "Deleting old $CONTAINER_NAME"
-lxc delete -f $CONTAINER_NAME || true
-echo "lxc launch $REMOTE:$IMAGE $CONTAINER_NAME"
-lxc launch $REMOTE:$IMAGE $CONTAINER_NAME
-lxc_wait_for_network $CONTAINER_NAME
+uvt-kvm destroy $CONTAINER_NAME || true
+echo "uvt-kvm create $CONTAINER_NAME arch=amd64 $REMOTE_ARG release=$IMAGE --password ubuntu"
+uvt-kvm create $CONTAINER_NAME arch=amd64 $REMOTE_ARG release=$IMAGE --password ubuntu
+uvt-kvm wait $CONTAINER_NAME
 if [ $DEBUG_SYMBOLS -eq 1 ]; then
-    release=$(lxc exec $CONTAINER_NAME -- lsb_release -cs)
-    version=$(lxc exec $CONTAINER_NAME -- lsb_release -rs)
+    release=$(uvt-kvm ssh $CONTAINER_NAME -- lsb_release -cs)
+    version=$(uvt-kvm ssh $CONTAINER_NAME -- lsb_release -rs)
     echo "deb http://ddebs.ubuntu.com $release main restricted universe multiverse
     deb http://ddebs.ubuntu.com $release-updates main restricted universe multiverse
     deb http://ddebs.ubuntu.com $release-proposed main restricted universe multiverse" | \
-    lxc exec $CONTAINER_NAME -- tee -a /etc/apt/sources.list.d/ddebs.list
+    uvt-kvm ssh $CONTAINER_NAME -- sudo tee -a /etc/apt/sources.list.d/ddebs.list
 
     if (( $(echo "$version >= 18.04" |bc -l) )); then
-        lxc exec $CONTAINER_NAME -- apt install -y ubuntu-dbgsym-keyring
+        uvt-kvm ssh $CONTAINER_NAME -- sudo apt install -y ubuntu-dbgsym-keyring
     else
-        lxc exec $CONTAINER_NAME -- apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F2EDC64DC5AEE1F6B9C621F0C8CAB6595FDFF622
+        uvt-kvm ssh $CONTAINER_NAME -- sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F2EDC64DC5AEE1F6B9C621F0C8CAB6595FDFF622
     fi
 fi
 echo "apt update"
-lxc exec $CONTAINER_NAME -- apt update
+uvt-kvm ssh $CONTAINER_NAME -- sudo apt update
 if [ $DIST_UPGRADE -eq 1 ]; then
     echo "apt dist-upgrade -y"
-    lxc exec $CONTAINER_NAME -- apt dist-upgrade -y
+    uvt-kvm ssh $CONTAINER_NAME -- sudo apt dist-upgrade -y
 fi
-lxc exec $CONTAINER_NAME -- apt autoremove -y
-lxc exec $CONTAINER_NAME bash
+uvt-kvm ssh $CONTAINER_NAME -- sudo apt autoremove -y
+uvt-kvm ssh $CONTAINER_NAME

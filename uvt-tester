@@ -39,4 +39,4 @@ fi
 
 RELEASE=$1
 
-lxc-latest -n tester -d $OPTIONS $RELEASE
+uvt-latest -n tester -d $OPTIONS $RELEASE
