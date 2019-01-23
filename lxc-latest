@@ -1,0 +1,80 @@
+#!/bin/bash
+
+set -eu
+
+show_help()
+{
+	echo "Usage: $(basename $0) [options] <image>
+
+Options:
+	-n <name>: Specify the name of the container to create (default same as image name)
+    -r <remote>: Specify which remote to use (default ubuntu-daily)
+    -u: Don't dist-upgrade"
+}
+
+usage()
+{
+	show_help
+	exit 1
+}
+
+lxc_is_network_up()
+{
+	container=$1
+    lxc exec $container -- grep $'\t0003\t' /proc/net/route >/dev/null
+}
+
+lxc_wait_for_network()
+{
+	container=$1
+    until lxc_is_network_up $container;
+    do
+        echo "Waiting for network"
+        sleep 1
+    done
+}
+
+CONTAINER_NAME=
+REMOTE=ubuntu-daily
+DIST_UPGRADE=1
+
+while getopts "?n:r:u" o; do
+    case "$o" in
+        \?)
+            show_help
+            exit 0
+            ;;
+        n)
+            CONTAINER_NAME=$OPTARG
+            ;;
+        r)
+            REMOTE=$OPTARG
+            ;;
+        u)
+            DIST_UPGRADE=0
+            ;;
+        *)
+            usage
+            ;;
+    esac
+done
+shift $((OPTIND-1))
+
+if [ $# -ne 1 ]; then
+	usage
+fi
+
+IMAGE=$1
+if [ -z "$CONTAINER_NAME" ]; then
+    CONTAINER_NAME=$IMAGE
+fi
+
+echo "Deleting old $CONTAINER_NAME"
+lxc delete -f $CONTAINER_NAME || true
+lxc launch $REMOTE:$IMAGE $CONTAINER_NAME
+lxc_wait_for_network $CONTAINER_NAME
+lxc exec $CONTAINER_NAME -- apt update
+if [ $DIST_UPGRADE -eq 1 ]; then
+    lxc exec $CONTAINER_NAME -- apt dist-upgrade -y
+fi
+lxc exec $CONTAINER_NAME bash

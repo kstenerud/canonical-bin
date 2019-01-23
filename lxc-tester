@@ -1,0 +1,42 @@
+#!/bin/bash
+
+show_help()
+{
+	echo "Usage: $(basename $0) [options] <image>
+
+Options:
+    -o: Use original image (not daily) and don't dist-upgrade"
+}
+
+usage()
+{
+	show_help
+	exit 1
+}
+
+OPTIONS=
+
+while getopts "?o" o; do
+    case "$o" in
+        \?)
+            show_help
+            exit 0
+            ;;
+        o)
+            OPTIONS="-r ubuntu -u"
+            ;;
+        *)
+            usage
+            ;;
+    esac
+done
+shift $((OPTIND-1))
+
+
+if [ $# -ne 1 ]; then
+	usage
+fi
+
+RELEASE=$1
+
+lxc-latest -n tester $OPTIONS $RELEASE
