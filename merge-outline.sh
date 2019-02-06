@@ -56,6 +56,9 @@ echo "Merge $PACKAGE $DEBIAN_VERSION into $UBUNTU_RELEASE
  * Orig Version: $ORIG_VERSION
  * Debian Version: $DEBIAN_VERSION
  * Ubuntu Version: $UBUNTU_VERSION
+ * Bug URL: https://bugs.launchpad.net/ubuntu/+source/$PACKAGE/+bug/$BUG_NUMBER
+ * PPA URL: https://launchpad.net/~${LP_USERNAME}/+archive/ubuntu/${UBUNTU_RELEASE}-${PACKAGE}-merge-${BUG_NUMBER}
+ * MP URL: TODO
 "
 
 echo "
