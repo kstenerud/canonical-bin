@@ -25,7 +25,10 @@ DEBIAN_RELEASE=sid
 PACKAGE="$2"
 UBUNTU_VERSION=$(rmadison $PACKAGE |grep $UBUNTU_RELEASE | sed 's/[^|]*| \([^ ]*\).*/\1/g' | tail -1)
 DEBIAN_VERSION=$(rmadison -u debian $PACKAGE |grep unstable | sed 's/[^|]*| \([^ ]*\).*/\1/g' | tail -1)
-ORIG_VERSION=$(echo $DEBIAN_VERSION | sed 's/\([^-]*\).*/\1/g')
+DEBIAN_VERSION_GIT_SAFE=$(echo "$DEBIAN_VERSION" | tr ':' '%')
+UBUNTU_VERSION_GIT_SAFE=$(echo "$UBUNTU_VERSION" | tr ':' '%')
+ORIG_VERSION=$(echo $DEBIAN_VERSION | sed 's/[^:]*:\(.*\)/\1/g' | sed 's/\([^-]*\).*/\1/g')
+
 
 if [[ ${UBUNTU_VERSION} == ${DEBIAN_VERSION}* ]]; then
 	(>&2 echo "It looks like the latest debian is already merged (debian $DEBIAN_VERSION vs ubuntu $UBUNTU_VERSION)")
@@ -41,6 +44,8 @@ if [ $# -ne 3 ]; then
 fi
 BUG_NUMBER="$3"
 
+MERGE_BRANCH_NAME="merge-${DEBIAN_VERSION_GIT_SAFE}-${UBUNTU_RELEASE}"
+PPA_NAME="ppa:${LP_USERNAME}/${UBUNTU_RELEASE}-${PACKAGE}-merge-${BUG_NUMBER}"
 
 if [ -z "$UBUNTU_VERSION" ]; then
 	(>&2 echo "Error: Could not determine ubuntu version of $PACKAGE")
@@ -73,7 +78,8 @@ echo "
 ### [ ] Clone the package repository
 
 \`\`\`
-git ubuntu clone $PACKAGE
+git ubuntu clone $PACKAGE &&
+cd $PACKAGE
 \`\`\`
 "
 
@@ -82,14 +88,14 @@ echo "
 ### [ ] Start a Git Ubuntu Merge
 
 \`\`\`
-git ubuntu merge start ubuntu/devel --bug $BUG_NUMBER
-git checkout -b merge-${DEBIAN_VERSION}-${UBUNTU_RELEASE}
+git ubuntu merge start ubuntu/devel --bug $BUG_NUMBER &&
+git checkout -b $MERGE_BRANCH_NAME
 \`\`\`
 
 #### [ ] Failed? Do it manually
 
 \`\`\`
-git checkout -b merge-${DEBIAN_VERSION}-${UBUNTU_RELEASE}
+git checkout -b $MERGE_BRANCH_NAME
 \`\`\`
 
 #### [ ] Create tags
@@ -97,14 +103,16 @@ git checkout -b merge-${DEBIAN_VERSION}-${UBUNTU_RELEASE}
 \`\`\`
 git log | grep 'tag: pkg/import' | grep -v ubuntu | head -1
 
-git tag lp${BUG_NUMBER}/old/ubuntu pkg/ubuntu/${UBUNTU_RELEASE}-devel
-git tag lp${BUG_NUMBER}/old/debian the-commit-hash
+git tag lp${BUG_NUMBER}/old/ubuntu pkg/ubuntu/${UBUNTU_RELEASE}-devel &&
+git tag lp${BUG_NUMBER}/old/debian the-commit-hash &&
 git tag lp${BUG_NUMBER}/new/debian pkg/debian/$DEBIAN_RELEASE
 \`\`\`
 
 #### [ ] Start a rebase
 
-    git rebase -i lp${BUG_NUMBER}/old/debian
+\`\`\`
+git rebase -i lp${BUG_NUMBER}/old/debian
+\`\`\`
 
 #### [ ] Clear any history prior to, and including import of $DEBIAN_VERSION
 
@@ -163,7 +171,7 @@ git rebase -i lp${BUG_NUMBER}/old/debian
 Differences only in changelog and control:
 
 \`\`\`
-git diff lp${BUG_NUMBER}/deconstruct/${UBUNTU_VERSION} |diffstat
+git diff lp${BUG_NUMBER}/deconstruct/${UBUNTU_VERSION_GIT_SAFE} |diffstat
 \`\`\`
 
 #### [ ] Create logical tag
@@ -177,7 +185,7 @@ git ubuntu tag --logical --bug $BUG_NUMBER
 Use the version number of the last ubuntu change.
 
 \`\`\`
-git tag -a -m \"Logical delta of $UBUNTU_VERSION\" lp${BUG_NUMBER}/logical/$UBUNTU_VERSION
+git tag -a -m \"Logical delta of $UBUNTU_VERSION_GIT_SAFE\" lp${BUG_NUMBER}/logical/$UBUNTU_VERSION_GIT_SAFE
 \`\`\`
 "
 
@@ -208,7 +216,9 @@ echo "
 -----------------------------------------------------------
 ### [ ] Finish the Merge
 
-    git ubuntu merge finish ubuntu/devel --bug $BUG_NUMBER
+\`\`\`
+git ubuntu merge finish ubuntu/devel --bug $BUG_NUMBER
+\`\`\`
 
 #### [ ] Failed? Finish the merge manually
 
@@ -254,20 +264,18 @@ git ubuntu export-orig
 #### [ ] Failed? Get orig tarball manually
 
 \`\`\`
-git checkout -b pkg/importer/debian/pristine-tar
-pristine-tar checkout ${PACKAGE}_${ORIG_VERSION}.orig.tar.gz
-git checkout merge-${DEBIAN_VERSION}-${UBUNTU_RELEASE}
+git checkout -b pkg/importer/debian/pristine-tar &&
+pristine-tar checkout ${PACKAGE}_${ORIG_VERSION}.orig.tar.gz &&
+git checkout $MERGE_BRANCH_NAME
 \`\`\`
 
 #### [ ] Failed?
 
-Where ~/work/packages/ubuntu/ is the directory above your git ubuntu clone:
-
 \`\`\`
-git checkout merge-${DEBIAN_VERSION}-${UBUNTU_RELEASE}
-cd /tmp
-pull-debian-source $PACKAGE
-mv ${PACKAGE}_${ORIG_VERSION}.orig.tar.* ~/work/packages/ubuntu/
+git checkout $MERGE_BRANCH_NAME &&
+cd /tmp &&
+pull-debian-source $PACKAGE &&
+mv ${PACKAGE}_${ORIG_VERSION}.orig.tar.* \"$OLDPWD/\" &&
 cd -
 \`\`\`
 "
@@ -293,7 +301,7 @@ dpkg-buildpackage -S -nc -d -sa -v${UBUNTU_VERSION}
 #### [ ] Check the built package for errors
 
 \`\`\`
-lintian --pedantic --display-info --verbose --info --profile ubuntu ../${PACKAGE}_${UBUNTU_VERSION}.dsc
+lintian --pedantic --display-info --verbose --info --profile ubuntu ../${PACKAGE}_put-version-here.dsc
 \`\`\`
 "
 
@@ -325,7 +333,7 @@ Name: ${UBUNTU_RELEASE}-${PACKAGE}-merge-${BUG_NUMBER}
 ### [ ] Upload files
 
 \`\`\`
-dput ppa:${LP_USERNAME}/${UBUNTU_RELEASE}-${PACKAGE}-merge-${BUG_NUMBER} ../${PACKAGE}_${UBUNTU_VERSION}_source.changes
+dput $PPA_NAME ../${PACKAGE}_put-version-here_source.changes
 \`\`\`
 
 #### [ ] Wait for packages to be ready
@@ -338,8 +346,40 @@ echo "
 -----------------------------------------------------------
 ### [ ] Test the New Build
 
- * Package tests
- * Install, upgrade
+#### [ ] Install Test
+
+\`\`\`
+lxc launch ubuntu-daily:${UBUNTU_RELEASE} tester && lxc exec tester bash
+add-apt-repository -y $PPA_NAME &&
+apt update && apt dist-upgrade -y && apt install -y amavisd-new
+(some command)
+\`\`\`
+
+#### [ ] Upgrade Test
+
+\`\`\`
+lxc launch ubuntu-daily:${UBUNTU_RELEASE} tester && lxc exec tester bash
+apt update && apt dist-upgrade -y && apt install -y amavisd-new &&
+(some command)
+add-apt-repository -y $PPA_NAME && apt update && apt dist-upgrade -y
+(some command)
+\`\`\`
+
+#### [ ] Package tests
+
+In a container:
+
+\`\`\`
+autopkgtest-build-lxd ubuntu-daily:${UBUNTU_RELEASE}/amd64
+autopkgtest -U -s -o dep8-mypackage-ppa --setup-commands=\"sudo add-apt-repository -y -u -s $PPA_NAME\" -B $PACKAGE -- lxd autopkgtest/ubuntu/$UBUNTU_RELEASE/amd64
+\`\`\`
+
+In a VM:
+
+\`\`\`
+autopkgtest-buildvm-ubuntu-cloud -r ${UBUNTU_RELEASE} -v --cloud-image-url http://cloud-images.ubuntu.com/daily/server
+autopkgtest -U -s -o dep8-mypackage-ppa --setup-commands=\"sudo add-apt-repository -y -u -s $PPA_NAME\" -B $PACKAGE -- qemu /var/lib/adt-images/autopkgtest-${UBUNTU_RELEASE}-amd64.img
+\`\`\`
 "
 
 echo "
@@ -357,17 +397,39 @@ echo "
 
 Example:
 
-    PPA: https://launchpad.net/~$LP_USERNAME/+archive/ubuntu/${UBUNTU_RELEASE}-${PACKAGE}-merge-${BUG_NUMBER}
+\`\`\`
+PPA: https://launchpad.net/~$LP_USERNAME/+archive/ubuntu/${UBUNTU_RELEASE}-${PACKAGE}-merge-${BUG_NUMBER}
 
-    Basic test:
+Upgrade:
 
-    echo \"echo abc >test.txt\" | at now + 1 minute && sleep 1m && cat test.txt && rm test.txt
+lxc launch ubuntu-daily:${UBUNTU_RELEASE} tester && lxc exec tester bash
+apt update && apt dist-upgrade -y && apt install -y amavisd-new &&
+(some command)
+add-apt-repository -y $PPA_NAME && apt update && apt dist-upgrade -y
+(some command)
 
-    Package tests:
+Install:
 
-    This package contains no tests.
+lxc launch ubuntu-daily:${UBUNTU_RELEASE} tester && lxc exec tester bash
+add-apt-repository -y $PPA_NAME &&
+apt update && apt dist-upgrade -y && apt install -y amavisd-new &&
+(some command)
+
+Package tests: none
+\`\`\`
 
 ### [ ] Open the review
 
 Change the MP status from \"work in progress\" to \"needs review\"
+"
+
+echo "
+-----------------------------------------------------------
+### [ ] Follow Migration (Package Tests)
+
+http://autopkgtest.ubuntu.com/packages/${PACKAGE:0:1}/$PACKAGE/$UBUNTU_RELEASE/amd64
+
+### [ ] Follow Migration (Proposed Migration)
+
+http://people.canonical.com/~ubuntu-archive/proposed-migration
 "
