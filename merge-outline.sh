@@ -351,7 +351,7 @@ echo "
 \`\`\`
 lxc launch ubuntu-daily:${UBUNTU_RELEASE} tester && lxc exec tester bash
 add-apt-repository -y $PPA_NAME &&
-apt update && apt dist-upgrade -y && apt install -y amavisd-new
+apt update && apt dist-upgrade -y && apt install -y $PACKAGE
 (some command)
 \`\`\`
 
@@ -359,9 +359,9 @@ apt update && apt dist-upgrade -y && apt install -y amavisd-new
 
 \`\`\`
 lxc launch ubuntu-daily:${UBUNTU_RELEASE} tester && lxc exec tester bash
-apt update && apt dist-upgrade -y && apt install -y amavisd-new &&
+apt update && apt dist-upgrade -y && apt install -y $PACKAGE &&
 (some command)
-add-apt-repository -y $PPA_NAME && apt update && apt dist-upgrade -y
+add-apt-repository -y $PPA_NAME && apt update && apt dist-upgrade -y &&
 (some command)
 \`\`\`
 
@@ -371,14 +371,14 @@ In a container:
 
 \`\`\`
 autopkgtest-build-lxd ubuntu-daily:${UBUNTU_RELEASE}/amd64
-autopkgtest -U -s -o dep8-mypackage-ppa --setup-commands=\"sudo add-apt-repository -y -u -s $PPA_NAME\" -B $PACKAGE -- lxd autopkgtest/ubuntu/$UBUNTU_RELEASE/amd64
+autopkgtest -U -s -o dep8-${PACKAGE}-ppa --setup-commands=\"sudo add-apt-repository -y -u -s $PPA_NAME\" -B $PACKAGE -- lxd autopkgtest/ubuntu/$UBUNTU_RELEASE/amd64
 \`\`\`
 
 In a VM:
 
 \`\`\`
 autopkgtest-buildvm-ubuntu-cloud -r ${UBUNTU_RELEASE} -v --cloud-image-url http://cloud-images.ubuntu.com/daily/server
-autopkgtest -U -s -o dep8-mypackage-ppa --setup-commands=\"sudo add-apt-repository -y -u -s $PPA_NAME\" -B $PACKAGE -- qemu /var/lib/adt-images/autopkgtest-${UBUNTU_RELEASE}-amd64.img
+autopkgtest -U -s -o dep8-${PACKAGE}-ppa --setup-commands=\"sudo add-apt-repository -y -u -s $PPA_NAME\" -B $PACKAGE -- qemu /var/lib/adt-images/autopkgtest-${UBUNTU_RELEASE}-amd64.img
 \`\`\`
 "
 
@@ -400,14 +400,6 @@ Example:
 \`\`\`
 PPA: https://launchpad.net/~$LP_USERNAME/+archive/ubuntu/${UBUNTU_RELEASE}-${PACKAGE}-merge-${BUG_NUMBER}
 
-Upgrade:
-
-lxc launch ubuntu-daily:${UBUNTU_RELEASE} tester && lxc exec tester bash
-apt update && apt dist-upgrade -y && apt install -y amavisd-new &&
-(some command)
-add-apt-repository -y $PPA_NAME && apt update && apt dist-upgrade -y
-(some command)
-
 Install:
 
 lxc launch ubuntu-daily:${UBUNTU_RELEASE} tester && lxc exec tester bash
@@ -415,7 +407,17 @@ add-apt-repository -y $PPA_NAME &&
 apt update && apt dist-upgrade -y && apt install -y amavisd-new &&
 (some command)
 
-Package tests: none
+Upgrade:
+
+lxc launch ubuntu-daily:${UBUNTU_RELEASE} tester && lxc exec tester bash
+apt update && apt dist-upgrade -y && apt install -y amavisd-new &&
+(some command)
+add-apt-repository -y $PPA_NAME && apt update && apt dist-upgrade -y &&
+(some command)
+
+Package tests:
+
+TODO
 \`\`\`
 
 ### [ ] Open the review
