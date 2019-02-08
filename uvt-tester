@@ -5,7 +5,8 @@ show_help()
 	echo "Usage: $(basename $0) [options] <image>
 
 Options:
-    -o: Use original image (not daily) and don't dist-upgrade"
+    -o: Use original image (not daily) and don't dist-upgrade
+    -s: Sync image first"
 }
 
 usage()
@@ -16,7 +17,7 @@ usage()
 
 OPTIONS=
 
-while getopts "?od" o; do
+while getopts "?ods" o; do
     case "$o" in
         \?)
             show_help
@@ -24,6 +25,9 @@ while getopts "?od" o; do
             ;;
         o)
             OPTIONS="$OPTIONS -r ubuntu -u"
+            ;;
+        s)
+            OPTIONS="$OPTIONS -s"
             ;;
         *)
             usage

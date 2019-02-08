@@ -11,11 +11,7 @@ Options:
     -r <remote>: Specify which remote to use (default ubuntu-daily)
     -u: Don't dist-upgrade
     -d: Add debug symbol repositories
-
-Use uvt-simplestreams-libvirt to sync the latest images:
-
-    uvt-simplestreams-libvirt sync --source http://cloud-images.ubuntu.com/daily arch=amd64 release=disco
-    uvt-simplestreams-libvirt sync arch=amd64 release=disco"
+    -s: Sync image first"
 }
 
 usage()
@@ -24,28 +20,13 @@ usage()
 	exit 1
 }
 
-lxc_is_network_up()
-{
-	container=$1
-    uvt-kvm ssh $container -- grep $'\t0003\t' /proc/net/route >/dev/null
-}
-
-lxc_wait_for_network()
-{
-	container=$1
-    until lxc_is_network_up $container;
-    do
-        echo "Waiting for network"
-        sleep 1
-    done
-}
-
 CONTAINER_NAME=
 REMOTE=daily
 DIST_UPGRADE=1
 DEBUG_SYMBOLS=0
+SYNC=0
 
-while getopts "?n:r:ud" o; do
+while getopts "?n:r:uds" o; do
     case "$o" in
         \?)
             show_help
@@ -62,6 +43,9 @@ while getopts "?n:r:ud" o; do
             ;;
         d)
             DEBUG_SYMBOLS=1
+            ;;
+        s)
+            SYNC=1
             ;;
         *)
             usage
@@ -84,6 +68,16 @@ if [ ! "$REMOTE" == "daily" ]; then
     REMOTE_ARG=
 fi
 
+if [ $SYNC -eq 1 ]; then
+    source_arg="--source http://cloud-images.ubuntu.com/daily"
+    if [ ! "$REMOTE" == "daily" ]; then
+        source_arg=
+    fi
+
+    echo "Syncing $IMAGE $REMOTE"
+    uvt-simplestreams-libvirt sync $source_arg arch=amd64 release=$IMAGE
+fi
+
 echo "Deleting old $CONTAINER_NAME"
 uvt-kvm destroy $CONTAINER_NAME || true
 echo "uvt-kvm create $CONTAINER_NAME arch=amd64 $REMOTE_ARG release=$IMAGE --password ubuntu"
@@ -97,11 +91,11 @@ if [ $DEBUG_SYMBOLS -eq 1 ]; then
     deb http://ddebs.ubuntu.com $release-proposed main restricted universe multiverse" | \
     uvt-kvm ssh $CONTAINER_NAME -- sudo tee -a /etc/apt/sources.list.d/ddebs.list
 
-    if (( $(echo "$version >= 18.04" |bc -l) )); then
-        uvt-kvm ssh $CONTAINER_NAME -- sudo apt install -y ubuntu-dbgsym-keyring
-    else
+    # if (( $(echo "$version >= 18.04" |bc -l) )); then
+    #     uvt-kvm ssh $CONTAINER_NAME -- sudo apt install -y ubuntu-dbgsym-keyring
+    # else
         uvt-kvm ssh $CONTAINER_NAME -- sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F2EDC64DC5AEE1F6B9C621F0C8CAB6595FDFF622
-    fi
+    # fi
 fi
 echo "apt update"
 uvt-kvm ssh $CONTAINER_NAME -- sudo apt update
