@@ -78,6 +78,8 @@ echo "Deleting old $CONTAINER_NAME"
 lxc delete -f $CONTAINER_NAME || true
 echo "lxc launch $REMOTE:$IMAGE $CONTAINER_NAME"
 lxc launch $REMOTE:$IMAGE $CONTAINER_NAME
+# TODO: Make this a command line switch
+# echo "Acquire::http { Proxy \"http://apt-cache:3142\"; }" | lxc exec $CONTAINER_NAME -- sudo tee /etc/apt/apt.conf.d/00-apt-proxy
 lxc_wait_for_network $CONTAINER_NAME
 if [ $DEBUG_SYMBOLS -eq 1 ]; then
     release=$(lxc exec $CONTAINER_NAME -- lsb_release -cs)
@@ -87,17 +89,25 @@ if [ $DEBUG_SYMBOLS -eq 1 ]; then
     deb http://ddebs.ubuntu.com $release-proposed main restricted universe multiverse" | \
     lxc exec $CONTAINER_NAME -- tee -a /etc/apt/sources.list.d/ddebs.list
 
-    if (( $(echo "$version >= 18.04" |bc -l) )); then
-        lxc exec $CONTAINER_NAME -- apt install -y ubuntu-dbgsym-keyring
-    else
+    # if (( $(echo "$version >= 18.04" |bc -l) )); then
+    #     lxc exec $CONTAINER_NAME -- apt install -y ubuntu-dbgsym-keyring
+    # else
         lxc exec $CONTAINER_NAME -- apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F2EDC64DC5AEE1F6B9C621F0C8CAB6595FDFF622
-    fi
+    # fi
 fi
 echo "apt update"
 lxc exec $CONTAINER_NAME -- apt update
 if [ $DIST_UPGRADE -eq 1 ]; then
+    if [ "$IMAGE" == "disco" ]; then
+        # Workaround for snapd.failure.service is a disabled or a static unit, not starting it
+        lxc exec $CONTAINER_NAME -- apt purge -y snapd
+    fi
     echo "apt dist-upgrade -y"
     lxc exec $CONTAINER_NAME -- apt dist-upgrade -y
+    if [ "$IMAGE" == "disco" ]; then
+        # Workaround for snapd.failure.service is a disabled or a static unit, not starting it
+        lxc exec $CONTAINER_NAME -- apt install -y snapd
+    fi
 fi
 lxc exec $CONTAINER_NAME -- apt autoremove -y
 lxc exec $CONTAINER_NAME bash
