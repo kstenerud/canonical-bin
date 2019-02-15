@@ -98,7 +98,7 @@ git checkout -b $MERGE_BRANCH_NAME
 git checkout -b $MERGE_BRANCH_NAME
 \`\`\`
 
-#### [ ] Create tags
+Create tags
 
 \`\`\`
 git log | grep 'tag: pkg/import' | grep -v ubuntu | head -1
@@ -108,15 +108,15 @@ git tag lp${BUG_NUMBER}/old/debian the-commit-hash &&
 git tag lp${BUG_NUMBER}/new/debian pkg/debian/$DEBIAN_RELEASE
 \`\`\`
 
-#### [ ] Start a rebase
+Start a rebase
 
 \`\`\`
 git rebase -i lp${BUG_NUMBER}/old/debian
 \`\`\`
 
-#### [ ] Clear any history prior to, and including import of $DEBIAN_VERSION
+Clear any history prior to, and including import of $DEBIAN_VERSION
 
-#### [ ] Create reconstruct tag
+Create reconstruct tag
 
 \`\`\`
 git ubuntu tag --reconstruct --bug $BUG_NUMBER
@@ -145,6 +145,7 @@ git show [hash] | diffstat
  2. Change the commit(s) you're going to deconstruct from \`pick\` to \`edit\`.
  3. git reset to get your changes back: \`git reset HEAD^\`
  4. Add commits in logical units
+ 5. \`git rebase --continue\`
 
 #### [ ] Tag Deconstructed
 
@@ -275,7 +276,7 @@ git checkout $MERGE_BRANCH_NAME
 git checkout $MERGE_BRANCH_NAME &&
 cd /tmp &&
 pull-debian-source $PACKAGE &&
-mv ${PACKAGE}_${ORIG_VERSION}.orig.tar.* \"$OLDPWD/\" &&
+mv ${PACKAGE}_${ORIG_VERSION}.orig.tar.* \"\$OLDPWD/../\" &&
 cd -
 \`\`\`
 "
@@ -404,13 +405,13 @@ Install:
 
 lxc launch ubuntu-daily:${UBUNTU_RELEASE} tester && lxc exec tester bash
 add-apt-repository -y $PPA_NAME &&
-apt update && apt dist-upgrade -y && apt install -y amavisd-new &&
+apt update && apt dist-upgrade -y && apt install -y $PACKAGE &&
 (some command)
 
 Upgrade:
 
 lxc launch ubuntu-daily:${UBUNTU_RELEASE} tester && lxc exec tester bash
-apt update && apt dist-upgrade -y && apt install -y amavisd-new &&
+apt update && apt dist-upgrade -y && apt install -y $PACKAGE &&
 (some command)
 add-apt-repository -y $PPA_NAME && apt update && apt dist-upgrade -y &&
 (some command)
