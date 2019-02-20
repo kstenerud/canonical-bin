@@ -4,9 +4,32 @@ set -eu
 
 print_usage()
 {
-	echo "Usage: $(basename $0) <ubuntu release> <package>"
-	echo "Usage: $(basename $0) <ubuntu release> <package> <bug number>"
+	echo "Usage: $(basename $0) [options] <ubuntu release> <package>
+
+Options:
+  -b <bug number>: Specify a bug number
+
+If a bug number is not specified, a dummy bug number made from yyyymmdd will be used"
 }
+
+BUG_NUMBER=$(date +%Y%m%d)
+
+while getopts "?b:" o; do
+    case "$o" in
+        \?)
+            print_usage
+            exit 0
+            ;;
+        b)
+			BUG_NUMBER=$OPTARG
+            ;;
+        *)
+            print_usage
+            exit 1
+            ;;
+    esac
+done
+shift $((OPTIND-1))
 
 if [ $# -lt 2 ]; then
 	print_usage
@@ -34,15 +57,6 @@ if [[ ${UBUNTU_VERSION} == ${DEBIAN_VERSION}* ]]; then
 	(>&2 echo "It looks like the latest debian is already merged (debian $DEBIAN_VERSION vs ubuntu $UBUNTU_VERSION)")
 	exit 1
 fi
-
-if [ $# -ne 3 ]; then
-	(>&2 echo "Go to https://bugs.launchpad.net/ubuntu/+source/$PACKAGE")
-	(>&2 echo "Summary: Please merge $DEBIAN_VERSION into $UBUNTU_RELEASE")
-    (>&2 echo "Description: tracking bug")
-    (>&2 echo "Then, re-run this command including the bug number")
-    exit 1
-fi
-BUG_NUMBER="$3"
 
 MERGE_BRANCH_NAME="merge-${DEBIAN_VERSION_GIT_SAFE}-${UBUNTU_RELEASE}"
 PPA_NAME="ppa:${LP_USERNAME}/${UBUNTU_RELEASE}-${PACKAGE}-merge-${BUG_NUMBER}"
@@ -130,7 +144,7 @@ echo "
 #### [ ] Check if there are commits to split
 
 \`\`\`
-git log --oneline
+git log --oneline | sed '/pkg\/debian\//Q'
 \`\`\`
 
 Get all commit hashes since old/debian, and look for changelog:
