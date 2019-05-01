@@ -1,0 +1,21 @@
+#!/bin/bash
+
+print_usage()
+{
+	echo "Usage: $(basename $0) <search path> <identifier regex> <sed command>"
+}
+
+if [ $# -ne 3 ]; then
+	print_usage
+	exit 1
+fi
+
+SEARCH_PATH="$1"
+IDENTIFIER_REGEX="$2"
+SED_CMD="$3"
+
+for file in $(grep -l -r "$IDENTIFIER_REGEX" "$SEARCH_PATH"); do
+	if [ -f "$file" ]; then
+		sed -i "$SED_CMD" "$file"
+	fi
+done

@@ -1,0 +1,5 @@
+#!/bin/bash
+
+set -eu
+
+git show $1 | diffstat
